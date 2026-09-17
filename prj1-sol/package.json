@@ -12,7 +12,7 @@
     "cs544-js-utils": "file:cs544-js-utils.tgz",
     "cs544-node-utils": "file:cs544-node-utils.tgz"
   },
-  "script": {
+  "scripts": {
     "clean": "shx rm -rf dist",
     "build": "tsc",
     "postbuild": "shx chmod a+x dist/index.js",
