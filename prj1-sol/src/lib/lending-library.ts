@@ -46,9 +46,19 @@ export class LendingLibrary {
 
   //TODO: declare private TS properties for instance
   
+  private books: Record<ISBN, XBook>;
+  private searchList: Record<string, ISBN[]>;
+  private bookCheckouts: Record<ISBN, PatronId[]>;
+  private patronCheckouts: Record<PatronId, ISBN[]>;
+  
   constructor() {
     //TODO: initialize private TS properties for instance
+    this.books = {};
+    this.searchList = {};
+    this.bookCheckouts = {};
+    this.patronCheckouts = {};
   }
+
 
   /** Add one-or-more copies of book represented by req to this library.
    *
@@ -61,6 +71,11 @@ export class LendingLibrary {
    */
   addBook(req: Record<string, any>): Errors.Result<XBook> {
     //TODO
+    const validationRes = addBookValidation(req);
+    if(!validationRes.isOk) return validationRes;
+
+
+
     return Errors.errResult('TODO');  //placeholder
   }
 
@@ -108,9 +123,52 @@ export class LendingLibrary {
 
 /********************** Domain Utility Functions ***********************/
 
-
 //TODO: add domain-specific utility functions or classes.
 
+  /** Validate input for function addBook()
+   * 
+   * Errors:
+   *    MISSING: one-or-more of the required fields is missing.
+   *    BAD_TYPE: one-or-more fields have the incorrect type.
+   *    BAD_REQ: other issues like nCopies not a positive integer 
+   *             or book is already in library but data in obj is 
+   *             inconsistent with the data already present.
+   */
+  function addBookValidation(req: Record<string, any>): Errors.Result<string>{
+    //Check for missing fields
+    if (!req.hasOwnProperty("isbn") ||
+        !req.hasOwnProperty("title") ||
+        !req.hasOwnProperty("pages") ||
+        !req.hasOwnProperty("year") ||
+        !req.hasOwnProperty("authors") ||
+        !req.hasOwnProperty("publisher")
+      ) {
+      return Errors.errResult("MISSING");
+    }
+
+    //Type checking
+    if (typeof req.isbn === "string" &&
+        typeof req.title === "string" &&
+        req.authors instanceof Array &&
+          req.authors.every(author => typeof author === "string") &&
+        typeof req.pages === "number" &&
+        typeof req.year === "number" &&
+        typeof req.publisher === "string"
+        ) { 
+      if(req.nCopies <= 0 || typeof req.nCopies !== "number")
+        return Errors.errResult("BAD_REQ");
+
+
+      //Bad input checking
+
+
+
+
+      return Errors.okResult("OK");
+    }
+
+    return Errors.errResult("TODO");
+  }
 /********************* General Utility Functions ***********************/
 
 //TODO: add general utility functions or classes.
