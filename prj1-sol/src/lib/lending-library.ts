@@ -47,6 +47,8 @@ export class LendingLibrary {
   //TODO: declare private TS properties for instance
   
   constructor() {
+    
+
     //TODO: initialize private TS properties for instance
   }
 
@@ -74,6 +76,37 @@ export class LendingLibrary {
    *    BAD_REQ: no words in search
    */
   findBooks(req: Record<string, any>) : Errors.Result<XBook[]> {
+
+    const isValid = /\w/;
+
+
+    //destructure the input thats put into the req, make it not case sensitive
+    if (req.search === ""){
+      const msg = "Missing search field input";
+      return Errors.errResult(msg, "MISSING");
+    }
+
+    if (typeof req.search !== "string"){
+      const msg = "Search field is not a string";
+      return Errors.errResult(msg, "BAD_TYPE");
+    }
+
+    if (req.search.match(isValid) === null){
+      const msg = "Search did not contain any words";
+      return Errors.errResult(msg, "BAD_TYPE");
+    }
+  
+
+    
+
+
+
+    const books = new Map(); //placeholder element for now.
+    if (books.has(req.string)){
+
+    }
+
+    
     //TODO
     return Errors.errResult('TODO');  //placeholder
   }
@@ -87,6 +120,13 @@ export class LendingLibrary {
    *    BAD_REQ error on business rule violation.
    */
   checkoutBook(req: Record<string, any>) : Errors.Result<void> {
+
+
+    return Errors.errResult("Missing Field");
+
+    return Errors.errResult("Incorrect Input");
+
+    return Errors.errResult("Bad Request");
     //TODO
     return Errors.errResult('TODO');  //placeholder
   }
