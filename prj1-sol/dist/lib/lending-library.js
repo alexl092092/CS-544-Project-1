@@ -108,8 +108,20 @@ export class LendingLibrary {
      *    BAD_REQ error on business rule violation.
      */
     returnBook(req) {
-        //TODO 
-        return Errors.errResult('TODO'); //placeholder
+        //Validation
+        const validationRes = checkoutBookValidation(req, this.books);
+        if (!validationRes.isOk)
+            return validationRes;
+        const patronId = req.patronId;
+        const isbn = req.isbn;
+        const bookCheckoutIdx = this.bookCheckouts[isbn].indexOf(patronId);
+        const patronCheckoutIdx = this.patronCheckouts[patronId].indexOf(isbn);
+        if (bookCheckoutIdx == -1 || patronCheckoutIdx == -1) {
+            return Errors.errResult("Patron does not have the given book checked out", "BAD_REQ", "isbn");
+        }
+        this.bookCheckouts[isbn].splice(bookCheckoutIdx, 1);
+        this.patronCheckouts[patronId].splice(patronCheckoutIdx, 1);
+        return Errors.okResult(undefined); //placeholder
     }
 }
 /********************** Domain Utility Functions ***********************/

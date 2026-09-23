@@ -140,7 +140,6 @@ export class LendingLibrary {
     if(!this.bookCheckouts[isbn])
       this.bookCheckouts[isbn] = [];
 
-    
     if(this.patronCheckouts[patronId].includes(isbn)){
       return Errors.errResult("Patron cannot checkout the same book twice", "BAD_REQ", "isbn");
     }
@@ -163,8 +162,24 @@ export class LendingLibrary {
    *    BAD_REQ error on business rule violation.
    */
   returnBook(req: Record<string, any>) : Errors.Result<void> {
-    //TODO 
-    return Errors.errResult('TODO');  //placeholder
+    //Validation
+    const validationRes: Errors.Result<string> = checkoutBookValidation(req, this.books);
+    if(!validationRes.isOk) return validationRes;
+
+    const patronId: string = req.patronId;
+    const isbn: string = req.isbn;
+
+    const bookCheckoutIdx: number = this.bookCheckouts[isbn].indexOf(patronId);
+    const patronCheckoutIdx: number = this.patronCheckouts[patronId].indexOf(isbn);
+
+    if(bookCheckoutIdx == -1 || patronCheckoutIdx == -1){
+      return Errors.errResult("Patron does not have the given book checked out", "BAD_REQ", "isbn");
+    }
+
+    this.bookCheckouts[isbn].splice(bookCheckoutIdx, 1);
+    this.patronCheckouts[patronId].splice(patronCheckoutIdx, 1);
+
+    return Errors.okResult(undefined);  //placeholder
   }
   
 }
