@@ -169,6 +169,9 @@ export class LendingLibrary {
     const patronId: string = req.patronId;
     const isbn: string = req.isbn;
 
+    if(!this.patronCheckouts[patronId] || !this.bookCheckouts[isbn])
+      return Errors.errResult("Patron does not have the given book checked out", "BAD_REQ", "isbn");
+
     const bookCheckoutIdx: number = this.bookCheckouts[isbn].indexOf(patronId);
     const patronCheckoutIdx: number = this.patronCheckouts[patronId].indexOf(isbn);
 
