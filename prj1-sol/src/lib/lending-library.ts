@@ -135,6 +135,12 @@ export class LendingLibrary {
     const patronId: string = req.patronId;
     const isbn: string = req.isbn;
 
+    if(!this.patronCheckouts[patronId])
+      this.patronCheckouts[patronId] = [];
+    if(!this.bookCheckouts[isbn])
+      this.bookCheckouts[isbn] = [];
+
+    
     if(this.patronCheckouts[patronId].includes(isbn)){
       return Errors.errResult("Patron cannot checkout the same book twice", "BAD_REQ", "isbn");
     }
