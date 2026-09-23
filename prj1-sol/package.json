@@ -21,5 +21,6 @@
     "test": "mocha --reporter-options maxDiffSize=128000 dist/test",
     "predebug-test": "npm run build",
     "debug-test": "mocha --inspect-brk dist/test"
-  }
+  },
+  "type": "module"
 }
