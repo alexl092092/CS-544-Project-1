@@ -48,8 +48,8 @@ export class LendingLibrary {
   
   private books: Record<ISBN, XBook>;
   private searchList: Record<string, ISBN[]>;
-  private bookCheckouts: Record<ISBN, PatronId[]>;
-  private patronCheckouts: Record<PatronId, ISBN[]>;
+  private bookCheckouts: Record<ISBN, PatronId[]>;    //Keep track of which patrons have checked out a book
+  private patronCheckouts: Record<PatronId, ISBN[]>;  //Keep track of which books have been checked out by a patron
   
   constructor() {
     //TODO: initialize private TS properties for instance
@@ -70,12 +70,13 @@ export class LendingLibrary {
    *             inconsistent with the data already present.
    */
   addBook(req: Record<string, any>): Errors.Result<XBook> {
-    //TODO
+    //Validation
     const validationRes: Errors.Result<string> = addBookValidation(req);
     if(!validationRes.isOk) return validationRes;
 
     //Adding book to library
     const bookISBN: string = req.isbn;
+    //Convert req into XBook
     const book: XBook = {
       isbn: req.isbn,
       title: req.title,
@@ -85,12 +86,16 @@ export class LendingLibrary {
       publisher: req.publisher,
       nCopies: req.nCopies ?? 1,
     };
-
+    //   console.log(req.nCopies ?? 1);
+    // console.log(book.nCopies);
+    //Updating book list
     if(bookISBN in this.books)
       this.books[bookISBN].nCopies += book.nCopies;
     else
       this.books[bookISBN] = book;
 
+    //Updating book index list
+    updateSearchList(book, this.searchList);
 
     return Errors.okResult(book);
   }
@@ -116,10 +121,32 @@ export class LendingLibrary {
    *    MISSING: patronId or isbn field is missing
    *    BAD_TYPE: patronId or isbn field is not a string.
    *    BAD_REQ error on business rule violation.
+   * 
+   * 
+      private bookCheckouts: Record<ISBN, PatronId[]>;    //Keep track of which patrons have checked out a book
+      private patronCheckouts: Record<PatronId, ISBN[]>;  //Keep track of which books have been checked out by a patron
    */
   checkoutBook(req: Record<string, any>) : Errors.Result<void> {
-    //TODO
-    return Errors.errResult('TODO');  //placeholder
+    //Validation
+    const validationRes: Errors.Result<string> = checkoutBookValidation(req, this.books);
+    if(!validationRes.isOk) return validationRes;
+
+    //TODO: validate this later
+    const patronId: string = req.patronId;
+    const isbn: string = req.isbn;
+
+    if(this.patronCheckouts[patronId].includes(isbn)){
+      return Errors.errResult("Patron cannot checkout the same book twice", "BAD_REQ", "isbn");
+    }
+    const bookCount: number = this.books[isbn].nCopies;
+    if(this.bookCheckouts[isbn].length >= bookCount){
+      return Errors.errResult("Not enough copies to checkout", "BAD_REQ", "isbn");
+    }
+
+    this.bookCheckouts[isbn].push(patronId);
+    this.patronCheckouts[patronId].push(isbn);
+
+    return Errors.okResult(undefined); 
   }
 
   /** Set up patron req.patronId to returns book req.isbn.
@@ -156,14 +183,11 @@ export class LendingLibrary {
     const fieldNames: string[] = ["isbn", "title", "authors", "pages", "year", "publisher"];
     const types: string[] = ["string", "string", "Array", "number", "number", "string"];
     //Check for missing fields
-    //console.log("reachong here 1");
     for(let i: number = 0; i < fieldNames.length; i++){
       if(!Object.hasOwn(req, fieldNames[i])){   
         return Errors.errResult("Missing one or more required fields", "MISSING", fieldNames[i]);
       }
     }
-
-    // console.log("reachong here 3");
 
     //Type/input checking
     for(let i: number = 0; i < fields.length; i++){
@@ -199,13 +223,17 @@ export class LendingLibrary {
       }
 
 
-
-
       return Errors.okResult("OK");
     }
 
-  //   return Errors.errResult("TODO");
-  // }
+    function checkoutBookValidation(req: Record<string, any>, bookList: Record<ISBN, XBook>): Errors.Result<string>{
+      const isbn: string = req.isbn;
+      if(!(isbn in bookList)){
+        return Errors.errResult(`Book with ISBN ${isbn} does not exist`, "BAD_REQ", "nCopies");
+      }
+
+      return Errors.okResult("OK");
+    }
 /********************* General Utility Functions ***********************/
 
 //TODO: add general utility functions or classes.
@@ -228,11 +256,11 @@ function updateSearchList(book: XBook, searchList: Record<string, ISBN[]>): void
 
     //Updating searchList
     for(const word of bookWords){
-      if(word in this.searchList){
-        this.searchList[word].push(book.isbn);
+      if(word in searchList){
+        searchList[word].push(book.isbn);
       }
       else{
-        this.searchList[word] = [book.isbn];
+        searchList[word] = [book.isbn];
       }
     }
 }

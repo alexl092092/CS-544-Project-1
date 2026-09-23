@@ -55,6 +55,10 @@ export declare class LendingLibrary {
      *    MISSING: patronId or isbn field is missing
      *    BAD_TYPE: patronId or isbn field is not a string.
      *    BAD_REQ error on business rule violation.
+     *
+     *
+        private bookCheckouts: Record<ISBN, PatronId[]>;    //Keep track of which patrons have checked out a book
+        private patronCheckouts: Record<PatronId, ISBN[]>;  //Keep track of which books have been checked out by a patron
      */
     checkoutBook(req: Record<string, any>): Errors.Result<void>;
     /** Set up patron req.patronId to returns book req.isbn.
