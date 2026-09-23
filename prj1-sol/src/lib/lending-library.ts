@@ -192,72 +192,79 @@ export class LendingLibrary {
 
 //TODO: add domain-specific utility functions or classes.
 
-  /** Validate input for function addBook()
-   * 
-   * Errors:
-   *    MISSING: one-or-more of the required fields is missing.
-   *    BAD_TYPE: one-or-more fields have the incorrect type.
-   *    BAD_REQ: other issues like nCopies not a positive integer 
-   *             or book is already in library but data in obj is 
-   *             inconsistent with the data already present.
-   */
-  function addBookValidation(req: Record<string, any>): Errors.Result<string>{
-    //Array of all fields
-    const fields: (string | number | string[])[] = [req.isbn, req.title, req.authors, req.pages, req.year, req.publisher];
-    const fieldNames: string[] = ["isbn", "title", "authors", "pages", "year", "publisher"];
-    const types: string[] = ["string", "string", "Array", "number", "number", "string"];
-    //Check for missing fields
-    for(let i: number = 0; i < fieldNames.length; i++){
-      if(!Object.hasOwn(req, fieldNames[i])){   
-        return Errors.errResult("Missing one or more required fields", "MISSING", fieldNames[i]);
+/** Validate input for function addBook()
+ * 
+ * Errors:
+ *    MISSING: one-or-more of the required fields is missing.
+ *    BAD_TYPE: one-or-more fields have the incorrect type.
+ *    BAD_REQ: other issues like nCopies not a positive integer 
+ *             or book is already in library but data in obj is 
+ *             inconsistent with the data already present.
+ */
+function addBookValidation(req: Record<string, any>): Errors.Result<string>{
+  //Array of all fields
+  const fields: (string | number | string[])[] = [req.isbn, req.title, req.authors, req.pages, req.year, req.publisher];
+  const fieldNames: string[] = ["isbn", "title", "authors", "pages", "year", "publisher"];
+  const types: string[] = ["string", "string", "Array", "number", "number", "string"];
+  //Check for missing fields
+  for(let i: number = 0; i < fieldNames.length; i++){
+    if(!Object.hasOwn(req, fieldNames[i])){   
+      return Errors.errResult("Missing one or more required fields", "MISSING", fieldNames[i]);
+    }
+  }
+
+  //Type/input checking
+  for(let i: number = 0; i < fields.length; i++){
+    //Input checking for authors field
+    if(fieldNames[i] === "authors"){
+      if(!Array.isArray(fields[i])){
+        return Errors.errResult("Field 'authors' must be an array of strings", "BAD_TYPE", fieldNames[i]);
+      }
+      if(req.authors.length === 0){
+        return Errors.errResult("Field 'authors' must be at least contain one author", "BAD_TYPE", fieldNames[i]);
+      }
+      if(req.authors.some((author: string) => typeof author !== "string")){
+        return Errors.errResult("Field 'authors' must be an array of strings", "BAD_TYPE", fieldNames[i]);
+      }
+    }
+    else if(typeof fields[i] !== types[i]){
+      const msg: string = `Field ${fieldNames[i]} must be a ${types[i]}.`;
+      return Errors.errResult(msg, "BAD_TYPE", fieldNames[i]);
+    }
+  }
+
+  //Checking nCopies for >0 integer
+  if(Object.hasOwn(req, "nCopies")){
+      if(typeof req.nCopies !== "number"){
+        return Errors.errResult("nCopies must be a number", "BAD_TYPE", "nCopies");
+      }
+      if(!Number.isInteger(req.nCopies)){
+        return Errors.errResult("nCopies must be an integer", "BAD_REQ", "nCopies");
+      }
+      else if(req.nCopies <= 0){
+        return Errors.errResult("nCopies must be greater than zero", "BAD_REQ", "nCopies")
       }
     }
 
-    //Type/input checking
-    for(let i: number = 0; i < fields.length; i++){
-      //Input checking for authors field
-      if(fieldNames[i] === "authors"){
-        if(!Array.isArray(fields[i])){
-          return Errors.errResult("Field 'authors' must be an array of strings", "BAD_TYPE", fieldNames[i]);
-        }
-        if(req.authors.length === 0){
-          return Errors.errResult("Field 'authors' must be at least contain one author", "BAD_TYPE", fieldNames[i]);
-        }
-        if(req.authors.some((author: string) => typeof author !== "string")){
-          return Errors.errResult("Field 'authors' must be an array of strings", "BAD_TYPE", fieldNames[i]);
-        }
-      }
-      else if(typeof fields[i] !== types[i]){
-        const msg: string = `Field ${fieldNames[i]} must be a ${types[i]}.`;
-        return Errors.errResult(msg, "BAD_TYPE", fieldNames[i]);
-      }
+
+    return Errors.okResult("OK");
+  }
+
+  //Validate input for function checkoutBook() and returnBook()
+  function checkoutBookValidation(req: Record<string, any>, bookList: Record<ISBN, XBook>): Errors.Result<string>{
+    if(!(typeof req.isbn === "string")){
+      return Errors.errResult(`ISBN must be of type "string"`, "BAD_TYPE", "isbn");
+    }
+    if(!(typeof req.patronId === "string")){
+      return Errors.errResult(`Patron ID must be of type "string"`, "BAD_TYPE", "patronId");
     }
 
-    //Checking nCopies for >0 integer
-    if(Object.hasOwn(req, "nCopies")){
-        if(typeof req.nCopies !== "number"){
-          return Errors.errResult("nCopies must be a number", "BAD_TYPE", "nCopies");
-        }
-        if(!Number.isInteger(req.nCopies)){
-          return Errors.errResult("nCopies must be an integer", "BAD_REQ", "nCopies");
-        }
-        else if(req.nCopies <= 0){
-          return Errors.errResult("nCopies must be greater than zero", "BAD_REQ", "nCopies")
-        }
-      }
-
-
-      return Errors.okResult("OK");
+    if(!(req.isbn in bookList)){
+      return Errors.errResult(`Book with ISBN ${req.isbn} does not exist`, "BAD_REQ", "nCopies");
     }
 
-    function checkoutBookValidation(req: Record<string, any>, bookList: Record<ISBN, XBook>): Errors.Result<string>{
-      const isbn: string = req.isbn;
-      if(!(isbn in bookList)){
-        return Errors.errResult(`Book with ISBN ${isbn} does not exist`, "BAD_REQ", "nCopies");
-      }
-
-      return Errors.okResult("OK");
-    }
+    return Errors.okResult("OK");
+  }
 /********************* General Utility Functions ***********************/
 
 //TODO: add general utility functions or classes.
