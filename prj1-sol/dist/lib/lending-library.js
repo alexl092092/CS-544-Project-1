@@ -30,7 +30,22 @@ export class LendingLibrary {
         const validationRes = addBookValidation(req);
         if (!validationRes.isOk)
             return validationRes;
-        return Errors.errResult('TODO'); //placeholder
+        //Adding book to library
+        const bookISBN = req.isbn;
+        const book = {
+            isbn: req.isbn,
+            title: req.title,
+            authors: req.authors,
+            pages: req.pages,
+            year: req.year,
+            publisher: req.publisher,
+            nCopies: req.nCopies ?? 1,
+        };
+        if (bookISBN in this.books)
+            this.books[bookISBN].nCopies += book.nCopies;
+        else
+            this.books[bookISBN] = book;
+        return Errors.okResult(book);
     }
     /** Return all books matching (case-insensitive) all "words" in
      *  req.search, where a "word" is a max sequence of /\w/ of length > 1.
@@ -80,30 +95,77 @@ export class LendingLibrary {
  *             inconsistent with the data already present.
  */
 function addBookValidation(req) {
+    //Array of all fields
+    const fields = [req.isbn, req.title, req.authors, req.pages, req.year, req.publisher];
+    const fieldNames = ["isbn", "title", "authors", "pages", "year", "publisher"];
+    const types = ["string", "string", "Array", "number", "number", "string"];
     //Check for missing fields
-    if (!req.hasOwnProperty("isbn") ||
-        !req.hasOwnProperty("title") ||
-        !req.hasOwnProperty("pages") ||
-        !req.hasOwnProperty("year") ||
-        !req.hasOwnProperty("authors") ||
-        !req.hasOwnProperty("publisher")) {
-        return Errors.errResult("MISSING");
+    //console.log("reachong here 1");
+    for (let i = 0; i < fieldNames.length; i++) {
+        if (!Object.hasOwn(req, fieldNames[i])) {
+            return Errors.errResult("Missing one or more required fields", "MISSING", fieldNames[i]);
+        }
     }
-    //Type checking
-    if (typeof req.isbn === "string" &&
-        typeof req.title === "string" &&
-        req.authors instanceof Array &&
-        req.authors.every(author => typeof author === "string") &&
-        typeof req.pages === "number" &&
-        typeof req.year === "number" &&
-        typeof req.publisher === "string") {
-        if (req.nCopies <= 0 || typeof req.nCopies !== "number")
-            return Errors.errResult("BAD_REQ");
-        //Bad input checking
-        return Errors.okResult("OK");
+    // console.log("reachong here 3");
+    //Type/input checking
+    for (let i = 0; i < fields.length; i++) {
+        //Input checking for authors field
+        if (fieldNames[i] === "authors") {
+            if (!Array.isArray(fields[i])) {
+                return Errors.errResult("Field 'authors' must be an array of strings", "BAD_TYPE", fieldNames[i]);
+            }
+            if (req.authors.length === 0) {
+                return Errors.errResult("Field 'authors' must be at least contain one author", "BAD_TYPE", fieldNames[i]);
+            }
+            if (req.authors.some((author) => typeof author !== "string")) {
+                return Errors.errResult("Field 'authors' must be an array of strings", "BAD_TYPE", fieldNames[i]);
+            }
+        }
+        else if (typeof fields[i] !== types[i]) {
+            const msg = `Field ${fieldNames[i]} must be a ${types[i]}.`;
+            return Errors.errResult(msg, "BAD_TYPE", fieldNames[i]);
+        }
     }
-    return Errors.errResult("TODO");
+    //Checking nCopies for >0 integer
+    if (Object.hasOwn(req, "nCopies")) {
+        if (typeof req.nCopies !== "number") {
+            return Errors.errResult("nCopies must be a number", "BAD_TYPE", "nCopies");
+        }
+        if (!Number.isInteger(req.nCopies)) {
+            return Errors.errResult("nCopies must be an integer", "BAD_REQ", "nCopies");
+        }
+        else if (req.nCopies <= 0) {
+            return Errors.errResult("nCopies must be greater than zero", "BAD_REQ", "nCopies");
+        }
+    }
+    return Errors.okResult("OK");
 }
+//   return Errors.errResult("TODO");
+// }
 /********************* General Utility Functions ***********************/
 //TODO: add general utility functions or classes.
+function updateSearchList(book, searchList) {
+    //Adding words to search list   
+    const bookWords = new Set();
+    //Putting all distinct words into a set
+    for (const author of book.authors) {
+        const words = author.match(/\w+/g) || [];
+        for (const word of words) {
+            bookWords.add(word);
+        }
+    }
+    const words = book.title.match(/\w+/g) || [];
+    for (const word of words) {
+        bookWords.add(word);
+    }
+    //Updating searchList
+    for (const word of bookWords) {
+        if (word in this.searchList) {
+            this.searchList[word].push(book.isbn);
+        }
+        else {
+            this.searchList[word] = [book.isbn];
+        }
+    }
+}
 //# sourceMappingURL=lending-library.js.map
