@@ -110,40 +110,48 @@ export class LendingLibrary {
    *    BAD_TYPE: search field is not a string.
    *    BAD_REQ: no words in search
    */
-  findBooks(req: Record<string, any>) : Errors.Result<XBook[]> {
-
-    const isValid = /\w/;
-
-
+  findBooks(req: Record<string, any>) : Errors.Result<String []> {
     //destructure the input thats put into the req, make it not case sensitive
-    if (req.search === ""){
-      const msg = "Missing search field input";
-      return Errors.errResult(msg, "MISSING");
+
+    //validation
+    const validationRes: Errors.Result<string> = findBookValidation(req, this.searchList);
+    if(!validationRes.isOk) return validationRes;
+    const bookWords: Set<string> = new Set<string>();
+    const isbnMatch : string [] = [];
+
+    const book: Book = {
+      isbn: req.isbn,
+      title: req.title,
+      authors: req.authors,
+      pages: req.pages,
+      year: req.year,
+      publisher: req.publisher,
+      nCopies: req.nCopies ?? 1,
+    };
+
+
+    //Putting all distinct words into a set, using the same loops from updateSearchList
+    for(const author of book.authors){
+      const words: string[] = author.match(/\w+/g) || [];
+      for(const word of words){
+        bookWords.add(word);
+      }
     }
 
-    if (typeof req.search !== "string"){
-      const msg = "Search field is not a string";
-      return Errors.errResult(msg, "BAD_TYPE");
+    const words: string[] = book.title.match(/\w+/g) || [];
+    for(const word of words){
+      bookWords.add(word);
     }
 
-    if (req.search.match(isValid) === null){
-      const msg = "Search did not contain any words";
-      return Errors.errResult(msg, "BAD_TYPE");
-    }
-  
-
-    
-
-
-
-    const books = new Map(); //placeholder element for now.
-    if (books.has(req.string)){
-
+    for (const word of bookWords){
+      if(word in this.searchList){
+        isbnMatch.push(book.isbn);
+      }
     }
 
-    
+
     //TODO
-    return Errors.errResult('TODO');  //placeholder
+    return Errors.okResult(isbnMatch);  //placeholder
   }
 
 
@@ -153,8 +161,6 @@ export class LendingLibrary {
    *    MISSING: patronId or isbn field is missing
    *    BAD_TYPE: patronId or isbn field is not a string.
    *    BAD_REQ error on business rule violation.
-   * 
-   * 
       private bookCheckouts: Record<ISBN, PatronId[]>;    //Keep track of which patrons have checked out a book
       private patronCheckouts: Record<PatronId, ISBN[]>;  //Keep track of which books have been checked out by a patron
    */
@@ -307,6 +313,42 @@ function addBookValidation(req: Record<string, any>): Errors.Result<string>{
     }
 
     return Errors.okResult("OK");
+  }
+
+  //Validate input for function findBook(). Might be able to just use the checkoutvalidation, but for now making a seperate function.
+
+  function findBookValidation(req: Record<string, any>, searchList: Record<string, ISBN[]>): Errors.Result<string>{
+
+    
+    const isValid = /\w/g;
+
+
+    const wordBank: string [] = req.search.split(" "); 
+    
+    if (req.search === ""){
+      const msg = "Missing search field input";
+      return Errors.errResult(msg, "MISSING");
+    }
+
+    if (typeof req.search !== "string"){
+      const msg = "Search field is not a string";
+      return Errors.errResult(msg, "BAD_TYPE");
+    }
+
+    if (req.search.match(isValid) === null){
+      const msg = "Search did not contain any words";
+      return Errors.errResult(msg, "BAD_TYPE");
+    }
+    
+    for (const word of wordBank){
+      if (!(word in searchList)){
+      const msg = "No matching words found from search";
+      return Errors.errResult(msg, "BAD_REQ");
+      }
+    }
+    
+    return Errors.okResult("Ok");
+
   }
 /********************* General Utility Functions ***********************/
 
