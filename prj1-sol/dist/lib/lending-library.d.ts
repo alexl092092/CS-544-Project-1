@@ -48,15 +48,13 @@ export declare class LendingLibrary {
      *    BAD_TYPE: search field is not a string.
      *    BAD_REQ: no words in search
      */
-    findBooks(req: Record<string, any>): Errors.Result<XBook[]>;
+    findBooks(req: Record<string, any>): Errors.Result<String[]>;
     /** Set up patron req.patronId to check out book req.isbn.
      *
      *  Errors:
      *    MISSING: patronId or isbn field is missing
      *    BAD_TYPE: patronId or isbn field is not a string.
      *    BAD_REQ error on business rule violation.
-     *
-     *
         private bookCheckouts: Record<ISBN, PatronId[]>;    //Keep track of which patrons have checked out a book
         private patronCheckouts: Record<PatronId, ISBN[]>;  //Keep track of which books have been checked out by a patron
      */

@@ -42,8 +42,6 @@ export class LendingLibrary {
             publisher: req.publisher,
             nCopies: req.nCopies ?? 1,
         };
-        //   console.log(req.nCopies ?? 1);
-        // console.log(book.nCopies);
         //Updating book list
         if (bookISBN in this.books)
             this.books[bookISBN].nCopies += book.nCopies;
@@ -63,8 +61,40 @@ export class LendingLibrary {
      *    BAD_REQ: no words in search
      */
     findBooks(req) {
+        //destructure the input thats put into the req, make it not case sensitive
+        //validation
+        const validationRes = findBookValidation(req, this.searchList);
+        if (!validationRes.isOk)
+            return validationRes;
+        const bookWords = new Set();
+        const isbnMatch = [];
+        const book = {
+            isbn: req.isbn,
+            title: req.title,
+            authors: req.authors,
+            pages: req.pages,
+            year: req.year,
+            publisher: req.publisher,
+            nCopies: req.nCopies ?? 1,
+        };
+        //Putting all distinct words into a set, using the same loops from updateSearchList
+        for (const author of book.authors) {
+            const words = author.match(/\w+/g) || [];
+            for (const word of words) {
+                bookWords.add(word);
+            }
+        }
+        const words = book.title.match(/\w+/g) || [];
+        for (const word of words) {
+            bookWords.add(word);
+        }
+        for (const word of bookWords) {
+            if (word in this.searchList) {
+                isbnMatch.push(book.isbn);
+            }
+        }
         //TODO
-        return Errors.errResult('TODO'); //placeholder
+        return Errors.okResult(isbnMatch); //placeholder
     }
     /** Set up patron req.patronId to check out book req.isbn.
      *
@@ -72,8 +102,6 @@ export class LendingLibrary {
      *    MISSING: patronId or isbn field is missing
      *    BAD_TYPE: patronId or isbn field is not a string.
      *    BAD_REQ error on business rule violation.
-     *
-     *
         private bookCheckouts: Record<ISBN, PatronId[]>;    //Keep track of which patrons have checked out a book
         private patronCheckouts: Record<PatronId, ISBN[]>;  //Keep track of which books have been checked out by a patron
      */
@@ -82,20 +110,23 @@ export class LendingLibrary {
         const validationRes = checkoutBookValidation(req, this.books);
         if (!validationRes.isOk)
             return validationRes;
-        //TODO: validate this later
         const patronId = req.patronId;
         const isbn = req.isbn;
+        //Initialize checkout arrays if uninitialized
         if (!this.patronCheckouts[patronId])
             this.patronCheckouts[patronId] = [];
         if (!this.bookCheckouts[isbn])
             this.bookCheckouts[isbn] = [];
+        //Check if patron has already checked out this book
         if (this.patronCheckouts[patronId].includes(isbn)) {
             return Errors.errResult("Patron cannot checkout the same book twice", "BAD_REQ", "isbn");
         }
+        //Check if there are enough copies to checkout
         const bookCount = this.books[isbn].nCopies;
         if (this.bookCheckouts[isbn].length >= bookCount) {
             return Errors.errResult("Not enough copies to checkout", "BAD_REQ", "isbn");
         }
+        //Add book to patron checkout list and add patron ID to book checkout list
         this.bookCheckouts[isbn].push(patronId);
         this.patronCheckouts[patronId].push(isbn);
         return Errors.okResult(undefined);
@@ -114,11 +145,18 @@ export class LendingLibrary {
             return validationRes;
         const patronId = req.patronId;
         const isbn = req.isbn;
+        //Check if checkout arrays are initialized yet
+        //If not initialized, patron has not checked out anything
+        if (!this.patronCheckouts[patronId] || !this.bookCheckouts[isbn])
+            return Errors.errResult("Patron does not have the given book checked out", "BAD_REQ", "isbn");
+        //Find index of checked out books/patron id in arrays
         const bookCheckoutIdx = this.bookCheckouts[isbn].indexOf(patronId);
         const patronCheckoutIdx = this.patronCheckouts[patronId].indexOf(isbn);
+        //If index not found, book not checked out
         if (bookCheckoutIdx == -1 || patronCheckoutIdx == -1) {
             return Errors.errResult("Patron does not have the given book checked out", "BAD_REQ", "isbn");
         }
+        //Remove book from patron's checked out books and remove patron id from book checkout list
         this.bookCheckouts[isbn].splice(bookCheckoutIdx, 1);
         this.patronCheckouts[patronId].splice(patronCheckoutIdx, 1);
         return Errors.okResult(undefined); //placeholder
@@ -136,7 +174,7 @@ export class LendingLibrary {
  *             inconsistent with the data already present.
  */
 function addBookValidation(req) {
-    //Array of all fields
+    //Arrays for fields
     const fields = [req.isbn, req.title, req.authors, req.pages, req.year, req.publisher];
     const fieldNames = ["isbn", "title", "authors", "pages", "year", "publisher"];
     const types = ["string", "string", "Array", "number", "number", "string"];
@@ -179,17 +217,49 @@ function addBookValidation(req) {
     }
     return Errors.okResult("OK");
 }
+//Validate input for function checkoutBook() and returnBook()
 function checkoutBookValidation(req, bookList) {
-    const isbn = req.isbn;
-    if (!(isbn in bookList)) {
-        return Errors.errResult(`Book with ISBN ${isbn} does not exist`, "BAD_REQ", "nCopies");
+    //Check if input is valid
+    if (!(typeof req.isbn === "string")) {
+        return Errors.errResult(`ISBN must be of type "string"`, "BAD_TYPE", "isbn");
+    }
+    if (!(typeof req.patronId === "string")) {
+        return Errors.errResult(`Patron ID must be of type "string"`, "BAD_TYPE", "patronId");
+    }
+    //Check if isbn is valid
+    if (!(req.isbn in bookList)) {
+        return Errors.errResult(`Book with ISBN ${req.isbn} does not exist`, "BAD_REQ", "nCopies");
     }
     return Errors.okResult("OK");
 }
+//Validate input for function findBook(). Might be able to just use the checkoutvalidation, but for now making a seperate function.
+function findBookValidation(req, searchList) {
+    const isValid = /\w/g;
+    const wordBank = req.search.split(" ");
+    if (req.search === "") {
+        const msg = "Missing search field input";
+        return Errors.errResult(msg, "MISSING");
+    }
+    if (typeof req.search !== "string") {
+        const msg = "Search field is not a string";
+        return Errors.errResult(msg, "BAD_TYPE");
+    }
+    if (req.search.match(isValid) === null) {
+        const msg = "Search did not contain any words";
+        return Errors.errResult(msg, "BAD_REQ");
+    }
+    for (const word of wordBank) {
+        if (!(word in searchList)) {
+            const msg = "No matching words found from search";
+            return Errors.errResult(msg, "BAD_REQ");
+        }
+    }
+    return Errors.okResult("Ok");
+}
 /********************* General Utility Functions ***********************/
 //TODO: add general utility functions or classes.
+//Add each word in authors list and title to the search list
 function updateSearchList(book, searchList) {
-    //Adding words to search list   
     const bookWords = new Set();
     //Putting all distinct words into a set
     for (const author of book.authors) {

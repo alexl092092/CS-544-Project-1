@@ -13,7 +13,7 @@ export default async function main(args) {
     await go(process.argv.slice(2));
 }
 //change to true after completing addBook() method.
-const CHECK_INIT_LOAD = false;
+const CHECK_INIT_LOAD = true;
 async function go(paths) {
     assert(paths.length > 0);
     const library = makeLendingLibrary();

@@ -337,7 +337,7 @@ function addBookValidation(req: Record<string, any>): Errors.Result<string>{
 
     if (req.search.match(isValid) === null){
       const msg = "Search did not contain any words";
-      return Errors.errResult(msg, "BAD_TYPE");
+      return Errors.errResult(msg, "BAD_REQ");
     }
     
     for (const word of wordBank){
