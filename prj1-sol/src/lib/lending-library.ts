@@ -71,13 +71,13 @@ export class LendingLibrary {
    */
   addBook(req: Record<string, any>): Errors.Result<XBook> {
     //Validation
-    const validationRes: Errors.Result<string> = addBookValidation(req);
+    const validationRes: Errors.Result<string> = addBookValidation(req, this.books);
     if(!validationRes.isOk) return validationRes;
 
     //Adding book to library
     const bookISBN: string = req.isbn;
     //Convert req into XBook
-    const book: XBook = {
+    let book: XBook = {
       isbn: req.isbn,
       title: req.title,
       authors: req.authors,
@@ -86,15 +86,17 @@ export class LendingLibrary {
       publisher: req.publisher,
       nCopies: req.nCopies ?? 1,
     };
-    
-    //Updating book list
-    if(bookISBN in this.books)
-      this.books[bookISBN].nCopies += book.nCopies;
-    else
-      this.books[bookISBN] = book;
 
-    //Updating book index list
-    updateSearchList(book, this.searchList);
+    //Updating book list
+    if(bookISBN in this.books){
+      this.books[bookISBN].nCopies += book.nCopies;
+      book = this.books[bookISBN]
+    }
+    else{
+      this.books[bookISBN] = book;
+      //Updating book index list if new book
+      updateSearchList(book, this.searchList);
+    }
 
     return Errors.okResult(book);
   }
@@ -141,12 +143,12 @@ export class LendingLibrary {
 
     //Check if patron has already checked out this book
     if(this.patronCheckouts[patronId].includes(isbn)){
-      return Errors.errResult("Patron cannot checkout the same book twice", "BAD_REQ", "isbn");
+      return Errors.errResult(`patron ${patronId} already has book ${isbn} checked out`, "BAD_REQ", "isbn");
     }
     //Check if there are enough copies to checkout
     const bookCount: number = this.books[isbn].nCopies;
     if(this.bookCheckouts[isbn].length >= bookCount){
-      return Errors.errResult("Not enough copies to checkout", "BAD_REQ", "isbn");
+      return Errors.errResult(`no copies of book ${isbn} are available for checkout`, "BAD_REQ", "isbn");
     }
 
     //Add book to patron checkout list and add patron ID to book checkout list
@@ -182,7 +184,7 @@ export class LendingLibrary {
 
     //If index not found, book not checked out
     if(bookCheckoutIdx == -1 || patronCheckoutIdx == -1){
-      return Errors.errResult("Patron does not have the given book checked out", "BAD_REQ", "isbn");
+      return Errors.errResult(`no checkout of book ${isbn} by patron ${patronId}`, "BAD_REQ", "isbn");
     }
 
     //Remove book from patron's checked out books and remove patron id from book checkout list
@@ -208,7 +210,7 @@ export class LendingLibrary {
  *             or book is already in library but data in obj is 
  *             inconsistent with the data already present.
  */
-function addBookValidation(req: Record<string, any>): Errors.Result<string>{
+function addBookValidation(req: Record<string, any>, books: Record<ISBN, XBook>): Errors.Result<string>{
   //Arrays for fields
   const fields: (string | number | string[])[] = [req.isbn, req.title, req.authors, req.pages, req.year, req.publisher];
   const fieldNames: string[] = ["isbn", "title", "authors", "pages", "year", "publisher"];
@@ -217,7 +219,7 @@ function addBookValidation(req: Record<string, any>): Errors.Result<string>{
   //Check for missing fields
   for(let i: number = 0; i < fieldNames.length; i++){
     if(!Object.hasOwn(req, fieldNames[i])){   
-      return Errors.errResult("Missing one or more required fields", "MISSING", fieldNames[i]);
+      return Errors.errResult(`property ${fieldNames[i]} is required`, "MISSING", fieldNames[i]);
     }
   }
 
@@ -226,17 +228,17 @@ function addBookValidation(req: Record<string, any>): Errors.Result<string>{
     //Input checking for authors field
     if(fieldNames[i] === "authors"){
       if(!Array.isArray(fields[i])){
-        return Errors.errResult("Field 'authors' must be an array of strings", "BAD_TYPE", fieldNames[i]);
+        return Errors.errResult("authors must have type string[]", "BAD_TYPE", fieldNames[i]);
       }
       if(req.authors.length === 0){
         return Errors.errResult("Field 'authors' must be at least contain one author", "BAD_TYPE", fieldNames[i]);
       }
       if(req.authors.some((author: string) => typeof author !== "string")){
-        return Errors.errResult("Field 'authors' must be an array of strings", "BAD_TYPE", fieldNames[i]);
+        return Errors.errResult("authors must have type string[]", "BAD_TYPE", fieldNames[i]);
       }
     }
     else if(typeof fields[i] !== types[i]){
-      const msg: string = `Field ${fieldNames[i]} must be a ${types[i]}.`;
+      const msg: string = `property ${fieldNames[i]} must be a ${types[i]}.`;
       return Errors.errResult(msg, "BAD_TYPE", fieldNames[i]);
     }
   }
@@ -254,23 +256,47 @@ function addBookValidation(req: Record<string, any>): Errors.Result<string>{
       }
     }
 
+    if(req.isbn in books){
+      const existingBook: XBook = books[req.isbn];
+      const existingFields: (string | number | string[])[] = [existingBook.isbn, existingBook.title, existingBook.authors, 
+        existingBook.pages, existingBook.year, existingBook.publisher];
+      for(let i: number = 0; i < fields.length; i++){
+        if(fieldNames[i] === "authors"){
+          for(let j: number = 0; j < req.authors.length; j++){
+            if(req.authors[i] !== existingBook.authors[i]){
+              return Errors.errResult(`inconsistent title data for book ${req.isbn}`, "BAD_TYPE", "authors");
+            }
+          }
+        }
+        else if(fields[i] !== existingFields[i]){
+          return Errors.errResult(`inconsistent title data for book ${req.isbn}`, "BAD_TYPE", fieldNames[i]);
+        }
+      }
+    }
 
     return Errors.okResult("OK");
   }
 
   //Validate input for function checkoutBook() and returnBook()
   function checkoutBookValidation(req: Record<string, any>, bookList: Record<ISBN, XBook>): Errors.Result<string>{
+    //Check if fields exist
+    if(!Object.hasOwn(req, "isbn")){   
+      return Errors.errResult(`property isbn is required`, "MISSING", "isbn");
+    }
+    if(!Object.hasOwn(req, "patronId")){   
+      return Errors.errResult(`property patronId is required`, "MISSING", "patronId");
+    }
     //Check if input is valid
     if(!(typeof req.isbn === "string")){
-      return Errors.errResult(`ISBN must be of type "string"`, "BAD_TYPE", "isbn");
+      return Errors.errResult(`property isbn must be a string`, "BAD_TYPE", "isbn");
     }
     if(!(typeof req.patronId === "string")){
-      return Errors.errResult(`Patron ID must be of type "string"`, "BAD_TYPE", "patronId");
+      return Errors.errResult(`property patronId must be a string"`, "BAD_TYPE", "patronId");
     }
 
     //Check if isbn is valid
     if(!(req.isbn in bookList)){
-      return Errors.errResult(`Book with ISBN ${req.isbn} does not exist`, "BAD_REQ", "nCopies");
+      return Errors.errResult(`unknown book ${req.isbn}`, "BAD_REQ", "isbn");
     }
 
     return Errors.okResult("OK");
