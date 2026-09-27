@@ -66,35 +66,26 @@ export class LendingLibrary {
         const validationRes = findBookValidation(req, this.searchList);
         if (!validationRes.isOk)
             return validationRes;
-        const bookWords = new Set();
-        const isbnMatch = [];
-        const book = {
-            isbn: req.isbn,
-            title: req.title,
-            authors: req.authors,
-            pages: req.pages,
-            year: req.year,
-            publisher: req.publisher,
-            nCopies: req.nCopies ?? 1,
-        };
+        const bookWords = req.search.match(/\w+/g) ?? [];
+        const bookWordsFilter = bookWords.map((bookWord) => bookWord.toLowerCase()).filter((bookWord) => bookWord.length > 1);
+        let isbnMatch;
         //Putting all distinct words into a set, using the same loops from updateSearchList
-        for (const author of book.authors) {
-            const words = author.match(/\w+/g) || [];
-            for (const word of words) {
-                bookWords.add(word);
+        for (const words of bookWordsFilter) {
+            const isbns = this.searchList[words] ?? [];
+            if (isbns.length === 0) {
+                return Errors.okResult([]);
+            }
+            const isbnSet = new Set(isbns);
+            if (isbnMatch === undefined) {
+                isbnMatch = isbnSet;
+            }
+            else {
+                isbnMatch = new Set([...isbnMatch].filter(isbn => isbnSet.has(isbn)));
             }
         }
-        const words = book.title.match(/\w+/g) || [];
-        for (const word of words) {
-            bookWords.add(word);
-        }
-        for (const word of bookWords) {
-            if (word in this.searchList) {
-                isbnMatch.push(book.isbn);
-            }
-        }
+        const books = [...(isbnMatch ?? [])].map(isbn => this.books[isbn]).sort((a, b) => a.title.localeCompare(b.title));
         //TODO
-        return Errors.okResult(isbnMatch); //placeholder
+        return Errors.okResult(books); //placeholder
     }
     /** Set up patron req.patronId to check out book req.isbn.
      *
@@ -236,23 +227,17 @@ function checkoutBookValidation(req, bookList) {
 function findBookValidation(req, searchList) {
     const isValid = /\w/g;
     const wordBank = req.search.split(" ");
-    if (req.search === "") {
+    if (!Object.hasOwn(req, "search")) {
         const msg = "Missing search field input";
-        return Errors.errResult(msg, "MISSING");
+        return Errors.errResult(msg, "MISSING", "search");
     }
     if (typeof req.search !== "string") {
         const msg = "Search field is not a string";
-        return Errors.errResult(msg, "BAD_TYPE");
+        return Errors.errResult(msg, "BAD_TYPE", "search");
     }
     if (req.search.match(isValid) === null) {
         const msg = "Search did not contain any words";
-        return Errors.errResult(msg, "BAD_REQ");
-    }
-    for (const word of wordBank) {
-        if (!(word in searchList)) {
-            const msg = "No matching words found from search";
-            return Errors.errResult(msg, "BAD_REQ");
-        }
+        return Errors.errResult(msg, "BAD_REQ", "search");
     }
     return Errors.okResult("Ok");
 }
@@ -274,11 +259,12 @@ function updateSearchList(book, searchList) {
     }
     //Updating searchList
     for (const word of bookWords) {
-        if (word in searchList) {
-            searchList[word].push(book.isbn);
+        const anyWord = word.toLowerCase();
+        if (anyWord in searchList) {
+            searchList[anyWord].push(book.isbn);
         }
         else {
-            searchList[word] = [book.isbn];
+            searchList[anyWord] = [book.isbn];
         }
     }
 }

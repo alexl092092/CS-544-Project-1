@@ -1,4 +1,5 @@
 import { Errors } from 'cs544-js-utils';
+import { okResult } from 'cs544-js-utils/dist/lib/errors';
 
 /** Note that errors are documented using the `code` option which must be
  *  returned (the `message` can be any suitable string which describes
@@ -110,48 +111,42 @@ export class LendingLibrary {
    *    BAD_TYPE: search field is not a string.
    *    BAD_REQ: no words in search
    */
-  findBooks(req: Record<string, any>) : Errors.Result<String []> {
+  findBooks(req: Record<string, any>) : Errors.Result<XBook []> {
     //destructure the input thats put into the req, make it not case sensitive
 
     //validation
     const validationRes: Errors.Result<string> = findBookValidation(req, this.searchList);
     if(!validationRes.isOk) return validationRes;
-    const bookWords: Set<string> = new Set<string>();
-    const isbnMatch : string [] = [];
+    const bookWords = req.search.match(/\w+/g) ?? [];
 
-    const book: Book = {
-      isbn: req.isbn,
-      title: req.title,
-      authors: req.authors,
-      pages: req.pages,
-      year: req.year,
-      publisher: req.publisher,
-      nCopies: req.nCopies ?? 1,
-    };
+    const bookWordsFilter = bookWords.map((bookWord: string) => bookWord.toLowerCase()).filter((bookWord: string) => bookWord.length > 1);
+    let isbnMatch : Set<string> | undefined;
 
 
     //Putting all distinct words into a set, using the same loops from updateSearchList
-    for(const author of book.authors){
-      const words: string[] = author.match(/\w+/g) || [];
-      for(const word of words){
-        bookWords.add(word);
-      }
+    for(const words of bookWordsFilter){
+     const isbns = this.searchList[words] ?? [];
+
+     if (isbns.length === 0)
+     {
+      return Errors.okResult([]);
+     }
+
+     const isbnSet = new Set(isbns);
+
+     if (isbnMatch === undefined){
+      isbnMatch = isbnSet;
+     }
+     else {
+      isbnMatch = new Set([...isbnMatch].filter(isbn => isbnSet.has(isbn)));
+     }
     }
 
-    const words: string[] = book.title.match(/\w+/g) || [];
-    for(const word of words){
-      bookWords.add(word);
-    }
-
-    for (const word of bookWords){
-      if(word in this.searchList){
-        isbnMatch.push(book.isbn);
-      }
-    }
+    const books = [...(isbnMatch ?? [])].map(isbn => this.books[isbn]).sort((a, b) => a.title.localeCompare(b.title));
 
 
     //TODO
-    return Errors.okResult(isbnMatch);  //placeholder
+    return Errors.okResult(books);  //placeholder
   }
 
 
@@ -325,26 +320,19 @@ function addBookValidation(req: Record<string, any>): Errors.Result<string>{
 
     const wordBank: string [] = req.search.split(" "); 
     
-    if (req.search === ""){
+    if (!Object.hasOwn(req, "search")){
       const msg = "Missing search field input";
-      return Errors.errResult(msg, "MISSING");
+      return Errors.errResult(msg, "MISSING", "search");
     }
 
     if (typeof req.search !== "string"){
       const msg = "Search field is not a string";
-      return Errors.errResult(msg, "BAD_TYPE");
+      return Errors.errResult(msg, "BAD_TYPE", "search");
     }
 
     if (req.search.match(isValid) === null){
       const msg = "Search did not contain any words";
-      return Errors.errResult(msg, "BAD_REQ");
-    }
-    
-    for (const word of wordBank){
-      if (!(word in searchList)){
-      const msg = "No matching words found from search";
-      return Errors.errResult(msg, "BAD_REQ");
-      }
+      return Errors.errResult(msg, "BAD_REQ", "search");
     }
     
     return Errors.okResult("Ok");
@@ -372,11 +360,14 @@ function updateSearchList(book: XBook, searchList: Record<string, ISBN[]>): void
 
     //Updating searchList
     for(const word of bookWords){
-      if(word in searchList){
-        searchList[word].push(book.isbn);
+
+      const anyWord = word.toLowerCase();
+
+      if(anyWord in searchList){
+        searchList[anyWord].push(book.isbn);
       }
       else{
-        searchList[word] = [book.isbn];
+        searchList[anyWord] = [book.isbn];
       }
     }
 }

@@ -48,7 +48,7 @@ export declare class LendingLibrary {
      *    BAD_TYPE: search field is not a string.
      *    BAD_REQ: no words in search
      */
-    findBooks(req: Record<string, any>): Errors.Result<String[]>;
+    findBooks(req: Record<string, any>): Errors.Result<XBook[]>;
     /** Set up patron req.patronId to check out book req.isbn.
      *
      *  Errors:
