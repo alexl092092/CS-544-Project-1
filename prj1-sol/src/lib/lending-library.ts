@@ -115,7 +115,7 @@ export class LendingLibrary {
     //destructure the input thats put into the req, make it not case sensitive
 
     //validation
-    const validationRes: Errors.Result<string> = findBookValidation(req, this.searchList);
+    const validationRes: Errors.Result<string> = findBookValidation(req);
     if(!validationRes.isOk) return validationRes;
     const bookWords = req.search.match(/\w+/g) ?? [];
 
@@ -312,13 +312,8 @@ function addBookValidation(req: Record<string, any>): Errors.Result<string>{
 
   //Validate input for function findBook(). Might be able to just use the checkoutvalidation, but for now making a seperate function.
 
-  function findBookValidation(req: Record<string, any>, searchList: Record<string, ISBN[]>): Errors.Result<string>{
-
-    
-    const isValid = /\w/g;
-
-
-    const wordBank: string [] = req.search.split(" "); 
+  function findBookValidation(req: Record<string, any>): Errors.Result<string>{
+    const isValid = /\w{2,}/g;
     
     if (!Object.hasOwn(req, "search")){
       const msg = "Missing search field input";
@@ -330,7 +325,7 @@ function addBookValidation(req: Record<string, any>): Errors.Result<string>{
       return Errors.errResult(msg, "BAD_TYPE", "search");
     }
 
-    if (req.search.match(isValid) === null){
+    if (!(isValid.test(req.search))){
       const msg = "Search did not contain any words";
       return Errors.errResult(msg, "BAD_REQ", "search");
     }
